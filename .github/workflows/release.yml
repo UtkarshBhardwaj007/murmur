@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            bundles: dmg
+            tauri-args: --target universal-apple-darwin
+          - os: ubuntu-latest
+            bundles: appimage,deb
+            tauri-args: ""
+          - os: windows-latest
+            bundles: msi,nsis
+            tauri-args: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev \
+            libasound2-dev \
+            libxdo-dev
+
+      # sherpa-onnx links statically; its build script requires this
+      # relocation model on Linux.
+      - name: Set Linux RUSTFLAGS for static sherpa-onnx
+        if: runner.os == 'Linux'
+        run: echo "RUSTFLAGS=-C relocation-model=dynamic-no-pic" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS universal targets
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install frontend tooling
+        run: npm ci || npm install
+
+      - name: Build bundles
+        run: npm run tauri build -- --bundles ${{ matrix.bundles }} ${{ matrix.tauri-args }}
+
+      - name: Collect and rename artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          case "${{ runner.os }}" in
+            macOS)
+              cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg \
+                 "dist/murmur-${VERSION}-macos-universal.dmg"
+              ;;
+            Linux)
+              cp src-tauri/target/release/bundle/appimage/*.AppImage \
+                 "dist/murmur-${VERSION}-linux-x86_64.AppImage"
+              cp src-tauri/target/release/bundle/deb/*.deb \
+                 "dist/murmur-${VERSION}-linux-x86_64.deb"
+              ;;
+            Windows)
+              cp src-tauri/target/release/bundle/msi/*.msi \
+                 "dist/murmur-${VERSION}-windows-x86_64.msi"
+              cp src-tauri/target/release/bundle/nsis/*-setup.exe \
+                 "dist/murmur-${VERSION}-windows-x86_64.exe"
+              ;;
+          esac
+          ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles-${{ matrix.os }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Extract changelog section
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          echo "---- notes ----"
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          generate_release_notes: true
+          files: dist/*
+          fail_on_unmatched_files: true
