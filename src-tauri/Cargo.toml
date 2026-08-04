@@ -24,7 +24,6 @@ anyhow = "1.0.104"
 log = "0.4.33"
 tauri-plugin-global-shortcut = "2.3.2"
 tauri-plugin-log = "2.9.0"
-sherpa-rs = { version = "0.6.8", default-features = false, features = ["download-binaries", "static"] }
 whisper-rs = "0.16.0"
 sha2 = "0.11.0"
 hex = "0.4.3"
@@ -46,3 +45,12 @@ tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 macos-accessibility-client = "0.0.2"
+
+# sherpa-onnx, statically linked everywhere. The prebuilt "static" archive
+# for Linux ships no .a files, so Linux builds sherpa-onnx from the source
+# vendored in sherpa-rs-sys (cmake) instead of downloading binaries.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+sherpa-rs = { version = "0.6.8", default-features = false, features = ["download-binaries", "static"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+sherpa-rs = { version = "0.6.8", default-features = false, features = ["static"] }
