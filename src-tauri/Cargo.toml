@@ -32,6 +32,8 @@ futures-util = "0.3.33"
 reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "stream", "http2"] }
 tokio = { version = "1.53.1", features = ["fs", "io-util"] }
 directories = "6.0.0"
+arboard = "3.6.1"
+enigo = "0.6.1"
 
 [profile.release]
 lto = true
@@ -40,3 +42,6 @@ strip = true
 
 [dev-dependencies]
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+macos-accessibility-client = "0.0.2"

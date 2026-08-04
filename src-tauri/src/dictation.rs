@@ -147,10 +147,18 @@ fn stop_and_process<R: Runtime>(app: &AppHandle<R>) {
     }
 
     match transcribe(app, &samples) {
-        Ok(transcript) => {
-            log::info!("transcript: {transcript:?}");
-            let _ = app.emit("transcript", &transcript);
-            // The paste-pipeline milestone consumes the transcript here.
+        Ok(raw) => {
+            let transcript = crate::postprocess::post_process(&raw);
+            log::info!("transcript: {transcript:?} (raw: {raw:?})");
+            if transcript.is_empty() {
+                log::info!("nothing to paste (empty transcript)");
+            } else {
+                let _ = app.emit("transcript", &transcript);
+                let auto_paste = app.state::<SettingsState>().get().auto_paste;
+                if let Err(e) = crate::paste::deliver(&transcript, auto_paste) {
+                    log::error!("delivering transcript failed: {e:#}");
+                }
+            }
         }
         Err(e) => log::error!("transcription failed: {e:#}"),
     }

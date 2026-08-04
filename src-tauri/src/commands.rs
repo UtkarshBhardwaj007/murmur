@@ -36,6 +36,31 @@ pub fn model_status<R: Runtime>(app: AppHandle<R>) -> Result<Vec<ModelStatus>, S
         .collect())
 }
 
+/// True when the OS lets us send the synthetic paste keystroke.
+#[tauri::command]
+pub fn accessibility_status() -> bool {
+    crate::paste::can_synthesize_input()
+}
+
+/// Trigger the macOS Accessibility permission prompt (no-op elsewhere).
+#[tauri::command]
+pub fn request_accessibility() -> bool {
+    crate::paste::prompt_for_permission()
+}
+
+/// Open the OS settings pane where the user can grant the permission.
+#[tauri::command]
+pub fn open_accessibility_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn download_model<R: Runtime>(app: AppHandle<R>, id: ModelId) -> Result<(), String> {
     let guard = app.state::<DownloadGuard>();

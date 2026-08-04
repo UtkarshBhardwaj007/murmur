@@ -115,3 +115,17 @@ button:disabled {
   opacity: 0.6;
   cursor: default;
 }
+
+button.secondary {
+  background: color-mix(in srgb, var(--fg) 12%, transparent);
+  color: var(--fg);
+}
+
+.card.warning {
+  border: 1px solid color-mix(in srgb, #e6a700 50%, transparent);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}

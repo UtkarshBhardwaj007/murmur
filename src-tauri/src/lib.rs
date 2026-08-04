@@ -3,6 +3,8 @@ mod commands;
 mod dictation;
 pub mod models;
 mod overlay;
+mod paste;
+pub mod postprocess;
 pub mod settings;
 pub mod stt;
 mod tray;
@@ -40,6 +42,13 @@ pub fn run() {
             if let Err(e) = apply_hotkey(app.handle(), &hotkey) {
                 log::error!("failed to register hotkey {hotkey:?}: {e}");
             }
+
+            // Auto-paste needs Accessibility on macOS; surface the guidance
+            // flow up front rather than failing on the first dictation.
+            if app.state::<SettingsState>().get().auto_paste && !paste::can_synthesize_input() {
+                log::warn!("input-synthesis permission missing; showing guidance");
+                show_settings(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -54,7 +63,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::model_status,
-            commands::download_model
+            commands::download_model,
+            commands::accessibility_status,
+            commands::request_accessibility,
+            commands::open_accessibility_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

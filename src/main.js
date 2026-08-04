@@ -84,4 +84,28 @@ listen("model-download-progress", ({ payload }) => {
 listen("model-download-complete", refresh);
 listen("model-required", () => refresh());
 
+async function checkAccessibility() {
+  const card = document.getElementById("accessibility");
+  try {
+    card.hidden = await invoke("accessibility_status");
+  } catch {
+    card.hidden = true;
+  }
+}
+
+document
+  .getElementById("grant-accessibility")
+  .addEventListener("click", async () => {
+    await invoke("request_accessibility");
+    await checkAccessibility();
+  });
+
+document
+  .getElementById("open-accessibility")
+  .addEventListener("click", () => invoke("open_accessibility_settings"));
+
+// The permission can be granted while the window is open; re-check on focus.
+window.addEventListener("focus", checkAccessibility);
+
+checkAccessibility();
 refresh();

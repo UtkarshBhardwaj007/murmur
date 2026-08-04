@@ -11,6 +11,21 @@
     <main class="container">
       <h1>Murmur</h1>
       <p class="subtitle">Local, private dictation.</p>
+      <section id="accessibility" class="card warning" hidden>
+        <h2>Enable auto-paste</h2>
+        <p class="hint">
+          Murmur needs the Accessibility permission to paste transcripts at
+          your cursor. Click below, then enable <strong>Murmur</strong> in
+          System Settings → Privacy &amp; Security → Accessibility, and
+          restart the app.
+        </p>
+        <div class="row">
+          <button id="grant-accessibility">Grant permission…</button>
+          <button id="open-accessibility" class="secondary">
+            Open System Settings
+          </button>
+        </div>
+      </section>
       <section id="models" class="card">
         <h2>Speech model</h2>
         <p class="hint">
