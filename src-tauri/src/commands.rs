@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-use crate::dictation::DictationState;
 use crate::models::{self, ModelId};
+use crate::settings::SettingsState;
 
 /// Guards against two concurrent model downloads.
 pub struct DownloadGuard(pub AtomicBool);
@@ -23,7 +23,7 @@ pub struct ModelStatus {
 #[tauri::command]
 pub fn model_status<R: Runtime>(app: AppHandle<R>) -> Result<Vec<ModelStatus>, String> {
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let active = app.state::<DictationState>().active_model();
+    let active = app.state::<SettingsState>().get().model;
     Ok(ModelId::ALL
         .iter()
         .map(|&id| ModelStatus {

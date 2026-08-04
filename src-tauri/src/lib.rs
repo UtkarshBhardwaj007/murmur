@@ -2,18 +2,15 @@ pub mod audio;
 mod commands;
 mod dictation;
 pub mod models;
+mod overlay;
+pub mod settings;
 pub mod stt;
 mod tray;
 
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
-/// Hardcoded default hotkey until the settings milestone makes it
-/// configurable.
-#[cfg(target_os = "macos")]
-const DEFAULT_HOTKEY: &str = "Cmd+Shift+Space";
-#[cfg(not(target_os = "macos"))]
-const DEFAULT_HOTKEY: &str = "Ctrl+Shift+Space";
+use settings::SettingsState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -26,21 +23,22 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        dictation::toggle(app);
-                    }
+                    dictation::on_hotkey(app, event.state() == ShortcutState::Pressed);
                 })
                 .build(),
         )
         .setup(|app| {
+            app.manage(SettingsState::load_or_default());
             app.manage(dictation::DictationState::new());
             app.manage(commands::DownloadGuard(std::sync::atomic::AtomicBool::new(
                 false,
             )));
             tray::create_tray(app.handle())?;
-            match app.global_shortcut().register(DEFAULT_HOTKEY) {
-                Ok(()) => log::info!("registered global hotkey {DEFAULT_HOTKEY}"),
-                Err(e) => log::error!("failed to register hotkey {DEFAULT_HOTKEY}: {e}"),
+            overlay::init(app.handle());
+
+            let hotkey = app.state::<SettingsState>().get().hotkey;
+            if let Err(e) = apply_hotkey(app.handle(), &hotkey) {
+                log::error!("failed to register hotkey {hotkey:?}: {e}");
             }
             Ok(())
         })
@@ -60,6 +58,22 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Replace whatever global shortcut is registered with `hotkey`.
+/// Returns an error (leaving no shortcut registered) if the string does not
+/// parse or the OS refuses the binding.
+pub fn apply_hotkey<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    hotkey: &str,
+) -> anyhow::Result<()> {
+    let gs = app.global_shortcut();
+    gs.unregister_all()
+        .map_err(|e| anyhow::anyhow!("unregistering shortcuts: {e}"))?;
+    gs.register(hotkey)
+        .map_err(|e| anyhow::anyhow!("registering {hotkey:?}: {e}"))?;
+    log::info!("registered global hotkey {hotkey}");
+    Ok(())
 }
 
 /// Show and focus the settings window, restoring it when hidden.

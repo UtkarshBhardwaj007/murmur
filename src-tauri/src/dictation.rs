@@ -8,14 +8,18 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use crate::audio::{self, Recorder};
 use crate::models::{self, ModelId};
+use crate::overlay::{self, UiState};
+use crate::settings::{DictationMode, SettingsState};
 use crate::stt::SttEngine;
 
 pub struct DictationState {
     recorder: Recorder,
     recording: Mutex<bool>,
-    /// Set while the stop→transcribe pipeline runs so a rapid re-toggle
+    /// Set while the stop→transcribe pipeline runs so a rapid re-trigger
     /// can't start a new recording mid-transcription.
     busy: AtomicBool,
+    /// Tracks physical hotkey state to swallow OS key-repeat Pressed events.
+    hotkey_down: AtomicBool,
     /// Lazily-loaded engine, kept alive between dictations.
     engine: Mutex<Option<(ModelId, Box<dyn SttEngine>)>>,
 }
@@ -26,52 +30,99 @@ impl DictationState {
             recorder: Recorder::spawn(),
             recording: Mutex::new(false),
             busy: AtomicBool::new(false),
+            hotkey_down: AtomicBool::new(false),
             engine: Mutex::new(None),
         }
     }
+}
 
-    /// The model used for transcription. Hardcoded until the settings
-    /// milestone; the default is Parakeet.
-    pub fn active_model(&self) -> ModelId {
-        ModelId::ParakeetTdt06bV2Int8
+/// Entry point for global hotkey events. Interprets press/release according
+/// to the configured dictation mode.
+pub fn on_hotkey<R: Runtime>(app: &AppHandle<R>, pressed: bool) {
+    let state = app.state::<DictationState>();
+    if pressed {
+        // Key repeat while held: the OS may deliver repeated Pressed events.
+        if state.hotkey_down.swap(true, Ordering::SeqCst) {
+            return;
+        }
+    } else {
+        state.hotkey_down.store(false, Ordering::SeqCst);
+    }
+
+    let mode = app.state::<SettingsState>().get().mode;
+    match mode {
+        DictationMode::Toggle => {
+            if pressed {
+                toggle(app);
+            }
+        }
+        DictationMode::PushToTalk => {
+            if pressed {
+                start(app);
+            } else {
+                request_stop(app);
+            }
+        }
     }
 }
 
 /// Toggle dictation: start recording if idle, otherwise stop and transcribe.
-/// Called from the global hotkey handler and the tray menu.
+/// Used by toggle mode and the tray menu (the Wayland-safe fallback).
 pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
+    let is_recording = *app
+        .state::<DictationState>()
+        .recording
+        .lock()
+        .expect("recording flag");
+    if is_recording {
+        request_stop(app);
+    } else {
+        start(app);
+    }
+}
+
+fn start<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<DictationState>();
     let mut recording = state.recording.lock().expect("recording flag");
     if *recording {
-        *recording = false;
-        drop(recording);
-        let app = app.clone();
-        // Transcription can take seconds; never block the main thread.
-        std::thread::spawn(move || stop_and_process(&app));
-    } else {
-        if state.busy.load(Ordering::SeqCst) {
-            log::warn!("ignoring start: still processing previous dictation");
-            return;
-        }
-        match state.recorder.start() {
-            Ok(()) => {
-                *recording = true;
-                set_tray_tooltip(app, "Murmur — recording…");
-                log::info!("recording started");
-            }
-            Err(e) => log::error!("failed to start recording: {e:#}"),
-        }
+        return;
     }
+    if state.busy.load(Ordering::SeqCst) {
+        log::warn!("ignoring start: still processing previous dictation");
+        return;
+    }
+    match state.recorder.start() {
+        Ok(()) => {
+            *recording = true;
+            drop(recording);
+            overlay::apply(app, UiState::Recording);
+            log::info!("recording started");
+        }
+        Err(e) => log::error!("failed to start recording: {e:#}"),
+    }
+}
+
+fn request_stop<R: Runtime>(app: &AppHandle<R>) {
+    let state = app.state::<DictationState>();
+    let mut recording = state.recording.lock().expect("recording flag");
+    if !*recording {
+        return;
+    }
+    *recording = false;
+    drop(recording);
+    let app = app.clone();
+    // Transcription can take seconds; never block the main thread.
+    std::thread::spawn(move || stop_and_process(&app));
 }
 
 fn stop_and_process<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<DictationState>();
     state.busy.store(true, Ordering::SeqCst);
-    set_tray_tooltip(app, "Murmur — transcribing…");
+    overlay::apply(app, UiState::Transcribing);
     let finish = |app: &AppHandle<R>| {
         let state = app.state::<DictationState>();
         state.busy.store(false, Ordering::SeqCst);
-        set_tray_tooltip(app, "Murmur — idle");
+        overlay::apply(app, UiState::Idle);
     };
 
     let samples = match state.recorder.stop() {
@@ -108,7 +159,7 @@ fn stop_and_process<R: Runtime>(app: &AppHandle<R>) {
 
 fn transcribe<R: Runtime>(app: &AppHandle<R>, samples: &[f32]) -> anyhow::Result<String> {
     let state = app.state::<DictationState>();
-    let model = state.active_model();
+    let model = app.state::<SettingsState>().get().model;
     let data_dir = app.path().app_data_dir()?;
 
     if !models::is_installed(&data_dir, model) {
@@ -150,10 +201,4 @@ fn save_debug_wav<R: Runtime>(
     let path = dir.join("last-recording.wav");
     audio::wav::write_wav_mono(&path, samples, audio::TARGET_SAMPLE_RATE)?;
     Ok(path)
-}
-
-fn set_tray_tooltip<R: Runtime>(app: &AppHandle<R>, text: &str) {
-    if let Some(tray) = app.tray_by_id(crate::tray::TRAY_ID) {
-        let _ = tray.set_tooltip(Some(text));
-    }
 }

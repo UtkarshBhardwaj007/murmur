@@ -5,7 +5,7 @@
 - [x] 1. **Scaffold** — Tauri 2 project builds and launches a tray icon + empty settings window on the current OS. `cargo check` clean. Initialize git, first commit, create `PROGRESS.md`.
 - [x] 2. **Audio capture** — record from default mic to a WAV on hotkey press (hardcoded hotkey for now); verify by inspecting the WAV's duration and sample rate in a test.
 - [x] 3. **STT integration** — model download manager with progress + checksum verification; sherpa-onnx transcribes the recorded WAV; add the mock-engine trait and tests.
-- [ ] 4. **Hotkey + modes** — configurable global shortcut, push-to-talk and toggle modes both working; recording indicator overlay with state changes.
+- [x] 4. **Hotkey + modes** — configurable global shortcut, push-to-talk and toggle modes both working; recording indicator overlay with state changes.
 - [ ] 5. **Paste pipeline** — clipboard write, synthetic paste, clipboard restore; macOS Accessibility detection and guidance flow; transcript post-processing.
 - [ ] 6. **Settings UI** — full settings window wired to the JSON store, including hotkey rebinding UI, model picker (with download-on-switch), launch-at-login.
 - [ ] 7. **Polish & docs** — app icon, README with install instructions per OS (including unsigned-binary caveats and Wayland notes), CHANGELOG, LICENSE.
@@ -14,20 +14,18 @@
 
 ## Current status / next action
 
-Milestone 3 done: model registry with pinned SHA-256 checksums (Parakeet TDT 0.6B v2
-int8 via sherpa-onnx, whisper.cpp ggml base.en), streaming download manager with
-progress events + hash-while-downloading verification + .part/rename atomicity.
-`SttEngine` trait with sherpa (nemo_transducer), whisper-rs, and mock implementations;
-transcription runs on a background thread and the engine stays loaded between
-dictations. Minimal model-download UI in the settings window.
-sherpa-rs uses `static` + `download-binaries` features (dynamic linking left the
-binary without an rpath for libonnxruntime on macOS — static fixes launch AND
-installer bundling). NOTE for CI (milestone 8): sherpa-rs static on Linux warns it
-needs RUSTFLAGS="-C relocation-model=dynamic-no-pic".
-Verified: 15 unit tests pass; both real engines transcribe a `say`-generated
-"hello world this is a test" WAV correctly (ignored tests `--test real_engine`,
-run locally with both models downloaded + checksum-verified end-to-end through
-`examples/download_model.rs`); clippy clean; app launches statically linked.
+Milestone 4 done: settings persistence (JSON via `directories` config dir, atomic
+save, corrupt-file fallback to defaults), hotkey read from settings and re-appliable
+via `apply_hotkey` (unregister_all + register), push-to-talk (Pressed→start,
+Released→stop) and toggle modes with key-repeat suppression, and a transparent
+always-on-top click-through overlay pill (bottom-center of the cursor's monitor)
+driven by `overlay::apply(UiState)` which also fans out tray tooltip + events.
+macOSPrivateApi enabled for window transparency.
+Verified: 21 unit tests (settings roundtrip/corrupt/partial/mode-strings added);
+clippy clean; app launches, loads default settings, registers hotkey. PTT key-up,
+overlay visuals, and monitor placement need human eyes → MANUAL_TESTING (milestone 7).
+NOTE for CI: sherpa-rs static on Linux wants RUSTFLAGS="-C relocation-model=dynamic-no-pic".
 
-**Next:** Milestone 4 — configurable global shortcut, push-to-talk + toggle modes,
-recording indicator overlay window with state changes.
+**Next:** Milestone 5 — paste pipeline: arboard clipboard write, enigo synthetic paste,
+clipboard restore ~1 s later, macOS Accessibility detection + guidance, transcript
+post-processing (trim, capitalize, strip partial trailing tokens) with tests.

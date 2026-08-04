@@ -8,6 +8,7 @@
   },
   "app": {
     "withGlobalTauri": true,
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
@@ -16,6 +17,23 @@
         "height": 640,
         "resizable": true,
         "visible": true
+      },
+      {
+        "label": "overlay",
+        "url": "overlay.html",
+        "title": "Murmur",
+        "width": 220,
+        "height": 52,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "visible": false,
+        "visibleOnAllWorkspaces": true,
+        "acceptFirstMouse": false
       }
     ],
     "security": {

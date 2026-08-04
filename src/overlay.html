@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Murmur</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        background: transparent;
+        overflow: hidden;
+        user-select: none;
+        -webkit-user-select: none;
+        cursor: default;
+      }
+      .pill {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        justify-content: center;
+        width: 208px;
+        height: 40px;
+        margin: 6px auto;
+        border-radius: 20px;
+        background: rgba(28, 28, 30, 0.92);
+        color: #f2f2f7;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Ubuntu, sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ff453a;
+      }
+      body[data-state="recording"] .dot {
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      body[data-state="transcribing"] .dot {
+        background: #7c5cff;
+        animation: spin-pulse 0.9s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.35);
+          opacity: 0.55;
+        }
+      }
+      @keyframes spin-pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+    </style>
+    <script type="module" src="overlay.js" defer></script>
+  </head>
+  <body data-state="recording">
+    <div class="pill">
+      <div class="dot"></div>
+      <span id="label">Listening…</span>
+    </div>
+  </body>
+</html>
