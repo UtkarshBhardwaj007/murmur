@@ -8,23 +8,20 @@
 - [x] 4. **Hotkey + modes** — configurable global shortcut, push-to-talk and toggle modes both working; recording indicator overlay with state changes.
 - [x] 5. **Paste pipeline** — clipboard write, synthetic paste, clipboard restore; macOS Accessibility detection and guidance flow; transcript post-processing.
 - [x] 6. **Settings UI** — full settings window wired to the JSON store, including hotkey rebinding UI, model picker (with download-on-switch), launch-at-login.
-- [ ] 7. **Polish & docs** — app icon, README with install instructions per OS (including unsigned-binary caveats and Wayland notes), CHANGELOG, LICENSE.
+- [x] 7. **Polish & docs** — app icon, README with install instructions per OS (including unsigned-binary caveats and Wayland notes), CHANGELOG, LICENSE.
 - [ ] 8. **CI green** — `ci.yml` passing on all three OS runners. Push and verify with `gh run watch`; fix cross-platform compile errors.
 - [ ] 9. **Release** — bump to `v0.1.0`, tag, push, verify `release.yml` produces a GitHub Release with all five installer artifacts attached. Download one artifact via `gh release download` to confirm.
 
 ## Current status / next action
 
-Milestone 6 done: get_settings/set_settings commands (hotkey re-registration with
-revert-on-failure, launch-at-login via tauri-plugin-autostart, model switch), full
-settings window: click-to-capture hotkey rebinding (KeyboardEvent.code → plugin
-format, requires a modifier, Esc cancels), mode radio (toggle/PTT), model radio
-picker with download-on-switch + progress bar + revert on failure, auto-paste and
-launch-at-login checkboxes, auto-save with "Saved" flash.
-Verified: 30 unit tests, clippy clean, app launches with no errors in log. UI
-interactions (rebinding, download-on-switch, autostart entry) need a human →
-MANUAL_TESTING.
-NOTE for CI: sherpa-rs static on Linux wants RUSTFLAGS="-C relocation-model=dynamic-no-pic".
+Milestone 7 done: app icon (purple gradient + white sound-wave, generated at 1024px,
+run through `tauri icon` for all platform sizes), tray icons for idle/recording/
+transcribing states swapped at runtime, README (features, per-OS install with
+Gatekeeper/SmartScreen/Wayland notes, screenshot placeholders, privacy, build docs),
+CHANGELOG (Keep a Changelog, 0.1.0 section), MIT LICENSE, docs/MANUAL_TESTING.md
+with per-OS human checklists.
+Verified: 30 tests, clippy clean, app launches with the new tray icon without errors.
 
-**Next:** Milestone 7 — polish & docs: app icon, README (per-OS install incl.
-unsigned-binary caveats + Wayland notes), CHANGELOG, LICENSE, docs/MANUAL_TESTING.md,
-tray icon state variants.
+**Next:** Milestone 8 — ci.yml (fmt, clippy -D warnings, test, debug build on the
+three OS runners) + push to GitHub and iterate until green. Remember Linux needs
+webkit2gtk/alsa apt packages and sherpa static needs RUSTFLAGS=-C relocation-model=dynamic-no-pic.

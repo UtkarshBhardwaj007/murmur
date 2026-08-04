@@ -15,8 +15,9 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<TrayIcon<R>>
     let quit = MenuItem::with_id(app, "quit", "Quit Murmur", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&dictate, &settings, &separator, &quit])?;
 
+    let idle_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-idle.png"))?;
     TrayIconBuilder::with_id(TRAY_ID)
-        .icon(app.default_window_icon().cloned().expect("bundled icon"))
+        .icon(idle_icon)
         .tooltip("Murmur — idle")
         .menu(&menu)
         .show_menu_on_left_click(true)

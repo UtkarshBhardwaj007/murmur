@@ -19,12 +19,26 @@ impl UiState {
             UiState::Transcribing => "Murmur — transcribing…",
         }
     }
+
+    fn tray_icon_bytes(self) -> &'static [u8] {
+        match self {
+            UiState::Idle => include_bytes!("../icons/tray-idle.png"),
+            UiState::Recording => include_bytes!("../icons/tray-recording.png"),
+            UiState::Transcribing => include_bytes!("../icons/tray-transcribing.png"),
+        }
+    }
 }
 
 /// Reflect a dictation state change across every UI surface.
 pub fn apply<R: Runtime>(app: &AppHandle<R>, state: UiState) {
     if let Some(tray) = app.tray_by_id(crate::tray::TRAY_ID) {
         let _ = tray.set_tooltip(Some(state.tooltip()));
+        match tauri::image::Image::from_bytes(state.tray_icon_bytes()) {
+            Ok(icon) => {
+                let _ = tray.set_icon(Some(icon));
+            }
+            Err(e) => log::warn!("could not decode tray icon: {e}"),
+        }
     }
 
     // The overlay listens for this to swap its label/animation.
