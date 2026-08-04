@@ -9,19 +9,18 @@
 - [x] 5. **Paste pipeline** — clipboard write, synthetic paste, clipboard restore; macOS Accessibility detection and guidance flow; transcript post-processing.
 - [x] 6. **Settings UI** — full settings window wired to the JSON store, including hotkey rebinding UI, model picker (with download-on-switch), launch-at-login.
 - [x] 7. **Polish & docs** — app icon, README with install instructions per OS (including unsigned-binary caveats and Wayland notes), CHANGELOG, LICENSE.
-- [ ] 8. **CI green** — `ci.yml` passing on all three OS runners. Push and verify with `gh run watch`; fix cross-platform compile errors.
+- [x] 8. **CI green** — `ci.yml` passing on all three OS runners. Push and verify with `gh run watch`; fix cross-platform compile errors.
 - [ ] 9. **Release** — bump to `v0.1.0`, tag, push, verify `release.yml` produces a GitHub Release with all five installer artifacts attached. Download one artifact via `gh release download` to confirm.
 
 ## Current status / next action
 
-Milestone 7 done: app icon (purple gradient + white sound-wave, generated at 1024px,
-run through `tauri icon` for all platform sizes), tray icons for idle/recording/
-transcribing states swapped at runtime, README (features, per-OS install with
-Gatekeeper/SmartScreen/Wayland notes, screenshot placeholders, privacy, build docs),
-CHANGELOG (Keep a Changelog, 0.1.0 section), MIT LICENSE, docs/MANUAL_TESTING.md
-with per-OS human checklists.
-Verified: 30 tests, clippy clean, app launches with the new tray icon without errors.
+Milestone 8 done: CI green on ubuntu/macos/windows (run 30957637066). Fixes needed:
+(1) pin windows-core 0.61 to unify cpal's windows crate graph; (2) Linux builds
+sherpa-onnx from vendored source — the prebuilt "static" tarball ships no .a files;
+(3) Windows: crt-static + trailing advapi32 link-arg + CMAKE_MSVC_RUNTIME_LIBRARY=
+MultiThreaded (CMP0091=NEW) so whisper.cpp, sherpa, onnxruntime, and Rust all agree
+on the static CRT; (4) dropped mobile-only staticlib/cdylib crate types.
 
-**Next:** Milestone 8 — ci.yml (fmt, clippy -D warnings, test, debug build on the
-three OS runners) + push to GitHub and iterate until green. Remember Linux needs
-webkit2gtk/alsa apt packages and sherpa static needs RUSTFLAGS=-C relocation-model=dynamic-no-pic.
+**Next:** Milestone 9 — release.yml building bundles on all three runners for a v* tag,
+artifact names murmur-<version>-<os>-<arch>.<ext>, GitHub Release with auto notes +
+CHANGELOG; tag v0.1.0; verify all five installers attach; download one to confirm.
