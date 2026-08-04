@@ -11,3 +11,11 @@ rustflags = [
   "-C", "target-feature=+crt-static",
   "-C", "link-arg=advapi32.lib",
 ]
+
+# whisper-rs-sys forwards CMAKE_* environment variables to whisper.cpp's
+# cmake invocation. Force the static MSVC runtime there too (CMP0091 must be
+# NEW for CMAKE_MSVC_RUNTIME_LIBRARY to take effect); both are ignored by
+# non-MSVC toolchains, so setting them globally is harmless.
+[env]
+CMAKE_MSVC_RUNTIME_LIBRARY = "MultiThreaded"
+CMAKE_POLICY_DEFAULT_CMP0091 = "NEW"
