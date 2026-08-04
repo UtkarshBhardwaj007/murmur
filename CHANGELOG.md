@@ -32,5 +32,5 @@ and this project adheres to
 - Installers: `.dmg` (universal macOS), `.msi` + NSIS `.exe` (Windows),
   `.AppImage` + `.deb` (Linux).
 
-[Unreleased]: https://github.com/bhardwajutkarsh/murmur/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/bhardwajutkarsh/murmur/releases/tag/v0.1.0
+[Unreleased]: https://github.com/UtkarshBhardwaj007/murmur/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/UtkarshBhardwaj007/murmur/releases/tag/v0.1.0

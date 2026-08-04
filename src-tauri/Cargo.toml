@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Local, private dictation for your desktop"
 authors = ["Utkarsh Bhardwaj"]
 license = "MIT"
-repository = "https://github.com/bhardwajutkarsh/murmur"
+repository = "https://github.com/UtkarshBhardwaj007/murmur"
 edition = "2021"
 
 [lib]
