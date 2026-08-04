@@ -129,3 +129,72 @@ button.secondary {
   display: flex;
   gap: 10px;
 }
+
+.field {
+  margin: 12px 0;
+}
+
+.field > label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.field.checkbox > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.hint.indent {
+  margin: 4px 0 0 24px;
+}
+
+button.hotkey {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  min-width: 220px;
+}
+
+button.hotkey.capturing {
+  outline: 2px solid var(--accent);
+}
+
+.error-text {
+  color: #d33;
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+
+.segmented label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.mode-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.model-row input[type="radio"] {
+  margin-right: 4px;
+  accent-color: var(--accent);
+}
+
+.model-row {
+  cursor: pointer;
+}
+
+.save-status {
+  position: fixed;
+  bottom: 12px;
+  right: 16px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}

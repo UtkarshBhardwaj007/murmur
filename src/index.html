@@ -11,6 +11,7 @@
     <main class="container">
       <h1>Murmur</h1>
       <p class="subtitle">Local, private dictation.</p>
+
       <section id="accessibility" class="card warning" hidden>
         <h2>Enable auto-paste</h2>
         <p class="hint">
@@ -26,17 +27,57 @@
           </button>
         </div>
       </section>
+
+      <section class="card">
+        <h2>Shortcut</h2>
+        <p class="hint">Press the shortcut, then speak. How it stops is up to you.</p>
+        <div class="field">
+          <label for="hotkey-btn">Dictation shortcut</label>
+          <button id="hotkey-btn" class="secondary hotkey"></button>
+        </div>
+        <p id="hotkey-error" class="error-text" hidden></p>
+        <div class="field">
+          <label>Mode</label>
+          <div class="segmented" role="radiogroup">
+            <label><input type="radio" name="mode" value="toggle" /> Toggle
+              <span class="mode-hint">press to start, press to stop</span></label>
+            <label><input type="radio" name="mode" value="push_to_talk" /> Push-to-talk
+              <span class="mode-hint">record while held</span></label>
+          </div>
+        </div>
+      </section>
+
       <section id="models" class="card">
         <h2>Speech model</h2>
         <p class="hint">
           Transcription runs entirely on this device. The model is downloaded
-          once and everything works offline afterwards.
+          once and everything works offline afterwards. Selecting a model that
+          isn't downloaded yet starts the download and switches when it
+          finishes.
         </p>
         <div id="model-list"></div>
       </section>
-      <section id="settings">
-        <p class="placeholder">More settings coming soon.</p>
+
+      <section class="card">
+        <h2>Behavior</h2>
+        <div class="field checkbox">
+          <label>
+            <input type="checkbox" id="auto-paste" />
+            Paste transcript at the cursor
+          </label>
+          <p class="hint indent">
+            When off, the transcript is only copied to the clipboard.
+          </p>
+        </div>
+        <div class="field checkbox">
+          <label>
+            <input type="checkbox" id="launch-at-login" />
+            Launch Murmur at login
+          </label>
+        </div>
       </section>
+
+      <p id="save-status" class="save-status" hidden>Saved</p>
     </main>
   </body>
 </html>

@@ -36,6 +36,53 @@ pub fn model_status<R: Runtime>(app: AppHandle<R>) -> Result<Vec<ModelStatus>, S
         .collect())
 }
 
+#[tauri::command]
+pub fn get_settings<R: Runtime>(app: AppHandle<R>) -> crate::settings::Settings {
+    app.state::<SettingsState>().get()
+}
+
+/// Persist new settings and apply their side effects (hotkey registration,
+/// launch-at-login). Returns an error message when the hotkey can't be
+/// registered; the previous hotkey stays active in that case.
+#[tauri::command]
+pub fn set_settings<R: Runtime>(
+    app: AppHandle<R>,
+    new: crate::settings::Settings,
+) -> Result<(), String> {
+    let state = app.state::<SettingsState>();
+    let old = state.get();
+
+    if new.hotkey != old.hotkey {
+        if let Err(e) = crate::apply_hotkey(&app, &new.hotkey) {
+            // Try to keep the old binding working.
+            if let Err(revert) = crate::apply_hotkey(&app, &old.hotkey) {
+                log::error!("failed to restore previous hotkey: {revert:#}");
+            }
+            return Err(format!("could not register {:?}: {e:#}", new.hotkey));
+        }
+    }
+
+    if new.launch_at_login != old.launch_at_login {
+        use tauri_plugin_autostart::ManagerExt;
+        let autolaunch = app.autolaunch();
+        let result = if new.launch_at_login {
+            autolaunch.enable()
+        } else {
+            autolaunch.disable()
+        };
+        if let Err(e) = result {
+            log::error!("launch-at-login change failed: {e}");
+            return Err(format!("could not update launch at login: {e}"));
+        }
+    }
+
+    if new.model != old.model {
+        log::info!("active model switched to {:?}", new.model);
+    }
+
+    state.update(new).map_err(|e| format!("{e:#}"))
+}
+
 /// True when the OS lets us send the synthetic paste keystroke.
 #[tauri::command]
 pub fn accessibility_status() -> bool {
