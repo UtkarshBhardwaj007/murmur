@@ -1,5 +1,8 @@
-mod audio;
+pub mod audio;
+mod commands;
 mod dictation;
+pub mod models;
+pub mod stt;
 mod tray;
 
 use tauri::Manager;
@@ -31,6 +34,9 @@ pub fn run() {
         )
         .setup(|app| {
             app.manage(dictation::DictationState::new());
+            app.manage(commands::DownloadGuard(std::sync::atomic::AtomicBool::new(
+                false,
+            )));
             tray::create_tray(app.handle())?;
             match app.global_shortcut().register(DEFAULT_HOTKEY) {
                 Ok(()) => log::info!("registered global hotkey {DEFAULT_HOTKEY}"),
@@ -48,7 +54,10 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![
+            commands::model_status,
+            commands::download_model
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
