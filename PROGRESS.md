@@ -10,17 +10,20 @@
 - [x] 6. **Settings UI** — full settings window wired to the JSON store, including hotkey rebinding UI, model picker (with download-on-switch), launch-at-login.
 - [x] 7. **Polish & docs** — app icon, README with install instructions per OS (including unsigned-binary caveats and Wayland notes), CHANGELOG, LICENSE.
 - [x] 8. **CI green** — `ci.yml` passing on all three OS runners. Push and verify with `gh run watch`; fix cross-platform compile errors.
-- [ ] 9. **Release** — bump to `v0.1.0`, tag, push, verify `release.yml` produces a GitHub Release with all five installer artifacts attached. Download one artifact via `gh release download` to confirm.
+- [x] 9. **Release** — bump to `v0.1.0`, tag, push, verify `release.yml` produces a GitHub Release with all five installer artifacts attached. Download one artifact via `gh release download` to confirm.
 
 ## Current status / next action
 
-Milestone 8 done: CI green on ubuntu/macos/windows (run 30957637066). Fixes needed:
-(1) pin windows-core 0.61 to unify cpal's windows crate graph; (2) Linux builds
-sherpa-onnx from vendored source — the prebuilt "static" tarball ships no .a files;
-(3) Windows: crt-static + trailing advapi32 link-arg + CMAKE_MSVC_RUNTIME_LIBRARY=
-MultiThreaded (CMP0091=NEW) so whisper.cpp, sherpa, onnxruntime, and Rust all agree
-on the static CRT; (4) dropped mobile-only staticlib/cdylib crate types.
+**All milestones complete — v0.1.0 released.** 🎉
 
-**Next:** Milestone 9 — release.yml building bundles on all three runners for a v* tag,
-artifact names murmur-<version>-<os>-<arch>.<ext>, GitHub Release with auto notes +
-CHANGELOG; tag v0.1.0; verify all five installers attach; download one to confirm.
+- GitHub Release: https://github.com/UtkarshBhardwaj007/murmur/releases/tag/v0.1.0
+  with all five installers (macos-universal.dmg, windows .msi + .exe,
+  linux .AppImage + .deb), CHANGELOG body + auto-generated notes.
+- CI green on ubuntu/macos/windows.
+- Verified by downloading the dmg: universal binary (x86_64 + arm64),
+  microphone usage string present in Info.plist.
+- Release-only fix along the way: macOS minimumSystemVersion 10.15
+  (ggml uses std::filesystem).
+
+Remaining human work: run docs/MANUAL_TESTING.md on each OS and add real
+screenshots/GIF to the README placeholders.
