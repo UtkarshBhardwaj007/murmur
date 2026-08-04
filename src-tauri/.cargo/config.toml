@@ -1,0 +1,5 @@
+# onnxruntime (statically linked via sherpa-onnx) uses ETW and registry
+# APIs; advapi32 must come after every archive on the MSVC link line, which
+# a build-script rustc-link-lib cannot guarantee — a trailing link-arg can.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "link-arg=advapi32.lib"]
