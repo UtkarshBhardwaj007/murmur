@@ -185,7 +185,7 @@ fn stop_and_process<R: Runtime>(app: &AppHandle<R>) {
             } else {
                 let _ = app.emit("transcript", &transcript);
                 let auto_paste = app.state::<SettingsState>().get().auto_paste;
-                if let Err(e) = crate::paste::deliver(&transcript, auto_paste) {
+                if let Err(e) = crate::paste::deliver(app, &transcript, auto_paste) {
                     log::error!("delivering transcript failed: {e:#}");
                 }
             }

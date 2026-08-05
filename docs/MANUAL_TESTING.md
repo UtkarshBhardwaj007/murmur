@@ -31,6 +31,9 @@ Logs are the first debugging stop:
       letter capitalized.
 - [ ] Clipboard contents from before dictation (copy some text first) are
       restored ~1 s after the paste.
+- [ ] No "Murmur quit unexpectedly" dialog after dictation ends, and no new
+      entries in `~/Library/Logs/DiagnosticReports/murmur-*.ips` (regression
+      check for the off-main-thread paste crash).
 - [ ] Copy an **image** (screenshot), dictate, paste-restore returns the image.
 - [ ] Dictating silence pastes nothing and returns to idle.
 
