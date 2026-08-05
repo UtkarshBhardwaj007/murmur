@@ -45,11 +45,15 @@ jobs:
 
       - name: Build the fixed app
         shell: pwsh
+        # Must run from src-tauri: the crt-static/advapi32 rustflags live in
+        # src-tauri/.cargo/config.toml and only apply from inside that tree.
+        working-directory: src-tauri
         run: |
-          cargo build --release --manifest-path src-tauri/Cargo.toml
-          $exe = "$PWD\src-tauri\target\release\murmur.exe"
+          cargo build --release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exe = "$PWD\target\release\murmur.exe"
           Write-Host "Built exe: $exe"
-          Set-Content -Path exe-path.txt -Value $exe
+          Set-Content -Path ..\exe-path.txt -Value $exe
 
       - name: Launch, click, and observe
         shell: pwsh
