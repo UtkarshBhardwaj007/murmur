@@ -8,6 +8,18 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-05
+
+### Fixed
+
+- The app crashed ("Murmur quit unexpectedly") at the end of every
+  dictation with auto-paste enabled, which also meant the transcript was
+  never pasted. The synthetic Cmd+V was sent from a background thread, and
+  macOS's Text Input Sources services abort the process when touched off
+  the main thread. The paste keystroke now runs on the main thread, and a
+  guard turns any future off-main-thread call into an error instead of a
+  crash (covered by a regression test).
+
 ## [0.1.1] - 2026-08-05
 
 ### Fixed
@@ -57,6 +69,7 @@ and this project adheres to
 - Installers: `.dmg` (universal macOS), `.msi` + NSIS `.exe` (Windows),
   `.AppImage` + `.deb` (Linux).
 
-[Unreleased]: https://github.com/UtkarshBhardwaj007/murmur/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/UtkarshBhardwaj007/murmur/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/UtkarshBhardwaj007/murmur/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/UtkarshBhardwaj007/murmur/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/UtkarshBhardwaj007/murmur/releases/tag/v0.1.0
