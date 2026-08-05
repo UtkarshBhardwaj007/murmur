@@ -33,12 +33,17 @@ jobs:
             if (Test-Path $p) { Get-ItemProperty $p | Select-Object pv, name | Format-List }
           }
 
-      - name: Download and extract shipped installer
+      - name: Download and install shipped MSI
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri "https://github.com/UtkarshBhardwaj007/murmur/releases/download/v0.1.2/murmur-0.1.2-windows-x86_64.exe" -OutFile setup.exe
-          7z x setup.exe -oapp | Out-Null
-          Get-ChildItem app
+          Invoke-WebRequest -Uri "https://github.com/UtkarshBhardwaj007/murmur/releases/download/v0.1.2/murmur-0.1.2-windows-x86_64.msi" -OutFile murmur.msi
+          Start-Process msiexec -ArgumentList '/i','murmur.msi','/qn' -Wait
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Murmur","$env:ProgramFiles\Murmur" -Filter murmur.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { $exe = Get-ChildItem "C:\" -Filter murmur.exe -Recurse -Depth 3 -ErrorAction SilentlyContinue | Select-Object -First 1 }
+          Write-Host "Installed exe: $($exe.FullName)"
+          New-Item -ItemType Directory app -Force | Out-Null
+          Copy-Item $exe.FullName app\path.txt -ErrorAction SilentlyContinue
+          Set-Content -Path exe-path.txt -Value $exe.FullName
 
       - name: Launch, click, and observe
         shell: pwsh
@@ -67,7 +72,8 @@ jobs:
             public struct RECT { public int Left, Top, Right, Bottom; }
           }
           "@
-          $p = Start-Process -FilePath "app\murmur.exe" -PassThru
+          $exePath = (Get-Content exe-path.txt).Trim()
+          $p = Start-Process -FilePath $exePath -PassThru
           Start-Sleep -Seconds 12
           if ($p.HasExited) {
             Write-Host "RESULT: app exited BEFORE any click, exit code $($p.ExitCode) (0x$('{0:X8}' -f $p.ExitCode))"
@@ -90,30 +96,51 @@ jobs:
             }
             Write-Host "Chosen window to click: $h"
             if ($h -ne [IntPtr]::Zero) {
-              [Win32]::SetForegroundWindow($h) | Out-Null
+              function Click([int]$cx, [int]$cy) {
+                [Win32]::SetCursorPos($cx, $cy) | Out-Null
+                Start-Sleep -Milliseconds 120
+                [Win32]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+                [Win32]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+              }
               $r = New-Object Win32+RECT
               [Win32]::GetWindowRect($h, [ref]$r) | Out-Null
-              $x = [int](($r.Left + $r.Right) / 2); $y = [int](($r.Top + $r.Bottom) / 2)
-              Write-Host "Window rect ($($r.Left),$($r.Top))-($($r.Right),$($r.Bottom)); clicking at $x,$y"
-              [Win32]::SetCursorPos($x, $y) | Out-Null
-              Start-Sleep -Milliseconds 300
-              [Win32]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)  # left down
-              [Win32]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)  # left up
-              Start-Sleep -Seconds 8
-              # a second click near the top of the client area, like clicking a control
-              [Win32]::SetCursorPos($x, $r.Top + 80) | Out-Null
-              [Win32]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
-              [Win32]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
-              Start-Sleep -Seconds 8
+              $x = [int](($r.Left + $r.Right) / 2)
+              Write-Host "Window rect ($($r.Left),$($r.Top))-($($r.Right),$($r.Bottom))"
+              # Open notepad as the focus-toggle partner window.
+              $np = Start-Process notepad -PassThru
+              Start-Sleep -Seconds 2
+              # Stress loop: toggle focus and click around the window (incl. the
+              # model list area to trigger the async download command + progress
+              # event storm), like an impatient user, for up to ~4 minutes.
+              $deadline = (Get-Date).AddMinutes(4)
+              $i = 0
+              while ((Get-Date) -lt $deadline) {
+                $i++
+                [Win32]::SetForegroundWindow($h) | Out-Null
+                Start-Sleep -Milliseconds 200
+                # sweep clicks down the page: hits hotkey button, mode radios,
+                # model rows, checkboxes at various scroll positions
+                $ys = @(200, 300, 400, 450, 500, 560, 620)
+                Click $x ($r.Top + $ys[$i % $ys.Count])
+                Start-Sleep -Milliseconds 400
+                $p.Refresh()
+                if ($p.HasExited) { break }
+                if ($np -and -not $np.HasExited) { [Win32]::SetForegroundWindow($np.MainWindowHandle) | Out-Null }
+                Start-Sleep -Milliseconds 400
+                $p.Refresh()
+                if ($p.HasExited) { break }
+                if ($i % 20 -eq 0) { Write-Host "iteration $i, app still alive" }
+              }
+              Write-Host "Stress loop ended after $i iterations."
             } else {
               Write-Host "Window not found; is the app headless here?"
               Start-Sleep -Seconds 10
             }
             $p.Refresh()
             if ($p.HasExited) {
-              Write-Host "RESULT: app exited AFTER click, exit code $($p.ExitCode) (0x$('{0:X8}' -f $p.ExitCode))"
+              Write-Host "RESULT: app exited DURING stress, exit code $($p.ExitCode) (0x$('{0:X8}' -f $p.ExitCode))"
             } else {
-              Write-Host "RESULT: app still running after clicks. No crash reproduced."
+              Write-Host "RESULT: app still running after stress. No crash reproduced."
               Stop-Process -Id $p.Id -Force
             }
           }
