@@ -104,11 +104,20 @@ jobs:
       # with a real code signature, and a hardened-runtime app without the
       # audio-input entitlement is hard-denied microphone access (no prompt,
       # no System Settings entry). Neither may ever ship.
+      #
+      # The checks run against the app INSIDE the dmg — the artifact users
+      # actually install. (Tauri deletes the intermediate .app directory
+      # after packing the dmg, and verifying the shipped bytes is stronger
+      # anyway.)
       - name: Verify macOS code signature and entitlements
         if: runner.os == 'macOS'
         run: |
           set -euo pipefail
-          APP="src-tauri/target/universal-apple-darwin/release/bundle/macos/Murmur.app"
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          MOUNT=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" "$DMG"
+          trap 'hdiutil detach "$MOUNT" -force >/dev/null 2>&1 || true' EXIT
+          APP="$MOUNT/Murmur.app"
           codesign --verify --deep --strict "$APP"
           codesign -d --verbose=2 "$APP" 2>&1 | tee /tmp/murmur-signature.txt
           grep -q "^Identifier=com.murmur.app$" /tmp/murmur-signature.txt
@@ -121,6 +130,7 @@ jobs:
             echo "::error::audio-input entitlement missing; microphone would be hard-denied"
             exit 1
           fi
+          echo "signature and entitlements verified inside $DMG"
 
       - name: Collect and rename artifacts
         shell: bash
