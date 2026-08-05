@@ -212,6 +212,24 @@ listen("model-download-complete", refreshModels);
 listen("model-required", refreshModels);
 
 // ---------------------------------------------------------------------------
+// Microphone guidance (macOS)
+
+async function checkMicrophone() {
+  const card = document.getElementById("microphone");
+  try {
+    card.hidden = (await invoke("microphone_status")) !== "denied";
+  } catch {
+    card.hidden = true;
+  }
+}
+
+document
+  .getElementById("open-microphone")
+  .addEventListener("click", () => invoke("open_microphone_settings"));
+
+listen("mic-denied", checkMicrophone);
+
+// ---------------------------------------------------------------------------
 // Accessibility guidance (macOS)
 
 async function checkAccessibility() {
@@ -234,7 +252,10 @@ document
   .getElementById("open-accessibility")
   .addEventListener("click", () => invoke("open_accessibility_settings"));
 
-window.addEventListener("focus", checkAccessibility);
+window.addEventListener("focus", () => {
+  checkAccessibility();
+  checkMicrophone();
+});
 
 // ---------------------------------------------------------------------------
 // Init
@@ -244,4 +265,5 @@ window.addEventListener("focus", checkAccessibility);
   renderSettings();
   await refreshModels();
   await checkAccessibility();
+  await checkMicrophone();
 })();

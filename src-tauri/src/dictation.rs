@@ -83,12 +83,42 @@ pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
 
 fn start<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<DictationState>();
-    let mut recording = state.recording.lock().expect("recording flag");
-    if *recording {
+    if *state.recording.lock().expect("recording flag") {
         return;
     }
     if state.busy.load(Ordering::SeqCst) {
         log::warn!("ignoring start: still processing previous dictation");
+        return;
+    }
+    // The permission gate may block on the OS consent prompt, so the rest
+    // of the start path runs off the main thread.
+    let app = app.clone();
+    std::thread::spawn(move || start_after_permission_gate(&app));
+}
+
+/// Resolve microphone permission, then start capture. The microphone is
+/// never opened (not even for a format query) unless access is authorized —
+/// opening it while permission is undetermined makes macOS queue one system
+/// prompt per HAL access.
+fn start_after_permission_gate<R: Runtime>(app: &AppHandle<R>) {
+    const PROMPT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+    match crate::mic::ensure_authorized(PROMPT_TIMEOUT) {
+        crate::mic::MicPermission::Authorized => {}
+        crate::mic::MicPermission::Denied => {
+            log::error!("microphone access denied; guiding the user to System Settings");
+            let _ = app.emit("mic-denied", ());
+            crate::show_settings(app);
+            return;
+        }
+        crate::mic::MicPermission::NotDetermined => {
+            log::warn!("microphone permission prompt not answered; not recording");
+            return;
+        }
+    }
+
+    let state = app.state::<DictationState>();
+    let mut recording = state.recording.lock().expect("recording flag");
+    if *recording {
         return;
     }
     match state.recorder.start() {

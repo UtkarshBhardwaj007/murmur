@@ -1,6 +1,7 @@
 pub mod audio;
 mod commands;
 mod dictation;
+pub mod mic;
 pub mod models;
 mod overlay;
 mod paste;
@@ -72,7 +73,9 @@ pub fn run() {
             commands::download_model,
             commands::accessibility_status,
             commands::request_accessibility,
-            commands::open_accessibility_settings
+            commands::open_accessibility_settings,
+            commands::microphone_status,
+            commands::open_microphone_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

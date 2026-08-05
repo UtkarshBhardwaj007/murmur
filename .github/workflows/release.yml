@@ -66,6 +66,23 @@ jobs:
       - name: Build bundles
         run: npm run tauri build -- --bundles ${{ matrix.bundles }} ${{ matrix.tauri-args }}
 
+      # Regression guard: macOS TCC only persists permission grants (mic,
+      # accessibility) for apps with a real code signature. A linker-signed-
+      # only binary re-prompts on every launch, so an improperly signed
+      # bundle must fail the release, not ship.
+      - name: Verify macOS code signature
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          APP="src-tauri/target/universal-apple-darwin/release/bundle/macos/Murmur.app"
+          codesign --verify --deep --strict "$APP"
+          codesign -d --verbose=2 "$APP" 2>&1 | tee /tmp/murmur-signature.txt
+          grep -q "^Identifier=com.murmur.app$" /tmp/murmur-signature.txt
+          if grep -q "linker-signed" /tmp/murmur-signature.txt; then
+            echo "::error::bundle is only linker-signed; TCC grants will not persist"
+            exit 1
+          fi
+
       - name: Collect and rename artifacts
         shell: bash
         run: |

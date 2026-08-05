@@ -8,6 +8,17 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- macOS asked for microphone permission repeatedly (several stacked prompts
+  per recording, on every launch). The app bundle was only linker-signed, so
+  macOS could not persist the permission grant; bundles are now properly
+  ad-hoc signed (verified in CI) and recording waits for explicit
+  microphone authorization before opening the device, so the system prompt
+  appears exactly once.
+- Denied microphone access now shows a guided "open System Settings" card
+  instead of failing silently.
+
 ## [0.1.0] - 2026-08-04
 
 ### Added

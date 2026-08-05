@@ -57,9 +57,16 @@ Logs are the first debugging stop:
 - [ ] Tray → Quit exits the process.
 
 ## macOS specifics
-- [ ] First recording triggers the system **Microphone** permission prompt
-      with the explanatory text; denying it produces a clear log error, not
-      a crash.
+- [ ] First recording triggers **exactly one** system Microphone permission
+      prompt (with the explanatory text). After clicking Allow, no further
+      prompts ever appear — including after quitting and relaunching the
+      app. (Regression check for the linker-signed-bundle bug: multiple
+      stacked prompts per recording that return on every launch.)
+- [ ] `codesign -dvv /Applications/Murmur.app` shows
+      `Identifier=com.murmur.app` and does **not** show `linker-signed`.
+- [ ] Denying the mic prompt shows the "Microphone access is blocked" card
+      in Settings; the button opens the Privacy & Security → Microphone
+      pane; after enabling Murmur there, dictation works without restart.
 - [ ] Without **Accessibility** permission, the settings window shows the
       yellow "Enable auto-paste" card; "Grant permission…" triggers the
       system prompt; after enabling Murmur in System Settings and

@@ -12,6 +12,18 @@
       <h1>Murmur</h1>
       <p class="subtitle">Local, private dictation.</p>
 
+      <section id="microphone" class="card warning" hidden>
+        <h2>Microphone access is blocked</h2>
+        <p class="hint">
+          Murmur can't hear you: microphone access was denied. Enable
+          <strong>Murmur</strong> in System Settings → Privacy &amp; Security →
+          Microphone, then dictate again.
+        </p>
+        <div class="row">
+          <button id="open-microphone">Open System Settings</button>
+        </div>
+      </section>
+
       <section id="accessibility" class="card warning" hidden>
         <h2>Enable auto-paste</h2>
         <p class="hint">

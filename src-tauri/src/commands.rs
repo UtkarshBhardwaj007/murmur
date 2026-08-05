@@ -83,6 +83,25 @@ pub fn set_settings<R: Runtime>(
     state.update(new).map_err(|e| format!("{e:#}"))
 }
 
+/// Current microphone permission, without prompting.
+#[tauri::command]
+pub fn microphone_status() -> crate::mic::MicPermission {
+    crate::mic::status()
+}
+
+/// Open the OS settings pane for microphone privacy (no-op elsewhere).
+#[tauri::command]
+pub fn open_microphone_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// True when the OS lets us send the synthetic paste keystroke.
 #[tauri::command]
 pub fn accessibility_status() -> bool {
