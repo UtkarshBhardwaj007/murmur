@@ -8,6 +8,25 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-05
+
+### Fixed
+
+- Random crashes on Windows (the app closes instantly with nothing in the
+  log, typically while using the settings window). The Windows event loop
+  in the underlying UI toolkit is reference-counted without thread safety
+  (tauri-apps/tauri#15408), so cloning or dropping any window/webview
+  handle on a background thread can corrupt the heap. Murmur did this on
+  every dictation, event emit, and model download. All tray, window, and
+  event work is now funneled onto the main thread, and the model download
+  runs as a fire-and-forget command reporting through events instead of an
+  async command resolved on a worker thread.
+- Panics are now written to the log file before the process dies, so future
+  crash reports have a cause attached.
+- The settings window no longer polls macOS-only permission status every
+  3 seconds (and on every focus) on Windows and Linux.
+- Docs: corrected the log file location (`com.murmur.app`, `Murmur.log`).
+
 ## [0.1.2] - 2026-08-05
 
 ### Fixed

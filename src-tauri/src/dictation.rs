@@ -106,7 +106,9 @@ fn start_after_permission_gate<R: Runtime>(app: &AppHandle<R>) {
         crate::mic::MicPermission::Authorized => {}
         crate::mic::MicPermission::Denied => {
             log::error!("microphone access denied; guiding the user to System Settings");
-            let _ = app.emit("mic-denied", ());
+            crate::on_main_thread(app, |app| {
+                let _ = app.emit("mic-denied", ());
+            });
             crate::show_settings(app);
             return;
         }
@@ -183,7 +185,10 @@ fn stop_and_process<R: Runtime>(app: &AppHandle<R>) {
             if transcript.is_empty() {
                 log::info!("nothing to paste (empty transcript)");
             } else {
-                let _ = app.emit("transcript", &transcript);
+                let event_payload = transcript.clone();
+                crate::on_main_thread(app, move |app| {
+                    let _ = app.emit("transcript", &event_payload);
+                });
                 let auto_paste = app.state::<SettingsState>().get().auto_paste;
                 if let Err(e) = crate::paste::deliver(app, &transcript, auto_paste) {
                     log::error!("delivering transcript failed: {e:#}");
@@ -201,7 +206,9 @@ fn transcribe<R: Runtime>(app: &AppHandle<R>, samples: &[f32]) -> anyhow::Result
     let data_dir = app.path().app_data_dir()?;
 
     if !models::is_installed(&data_dir, model) {
-        let _ = app.emit("model-required", model);
+        crate::on_main_thread(app, move |app| {
+            let _ = app.emit("model-required", model);
+        });
         crate::show_settings(app);
         anyhow::bail!(
             "model {model:?} is not installed — open Settings to download it ({} MB)",

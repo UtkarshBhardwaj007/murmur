@@ -35,6 +35,15 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            // Panics in release builds die silently (no console on Windows,
+            // and an abort when unwinding crosses an FFI callback); mirror
+            // them into the log file so crash reports contain the cause.
+            let default_panic_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |info| {
+                log::error!("panic: {info}");
+                default_panic_hook(info);
+            }));
+
             app.manage(SettingsState::load_or_default());
             app.manage(dictation::DictationState::new());
             app.manage(commands::DownloadGuard(std::sync::atomic::AtomicBool::new(
@@ -106,10 +115,32 @@ pub fn apply_hotkey<R: tauri::Runtime>(
 }
 
 /// Show and focus the settings window, restoring it when hidden.
+/// Safe to call from any thread.
 pub fn show_settings<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
+    on_main_thread(app, |app| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    });
+}
+
+/// Run `f` on the main thread (immediately when already there).
+///
+/// Every window/webview/tray handle — and anything that clones one, like
+/// `emit` — must only be used on the main thread. On Windows, tao's event
+/// loop state is reference-counted with a plain (non-atomic) `Rc` that is
+/// buried inside every cloned Tauri handle; cloning or dropping such a
+/// handle on another thread races the refcount and corrupts the heap
+/// (tauri-apps/tauri#15408 — crashes the process with no log). Background
+/// work must funnel every handle-touching step through here.
+pub fn on_main_thread<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    f: impl FnOnce(&tauri::AppHandle<R>) + Send + 'static,
+) {
+    let handle = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || f(&handle)) {
+        log::error!("failed to dispatch task to the main thread: {e}");
     }
 }

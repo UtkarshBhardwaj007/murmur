@@ -1,6 +1,10 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
+// The microphone/accessibility permission cards only exist on macOS; other
+// platforms never need the status polling behind them.
+const IS_MACOS = navigator.userAgent.includes("Macintosh");
+
 // ---------------------------------------------------------------------------
 // Settings state
 
@@ -163,9 +167,12 @@ function renderModels() {
   );
 }
 
+// Model whose download this window is waiting on; when the
+// model-download-complete event for it arrives, it becomes the active model.
+let pendingModel = null;
+
 async function selectModel(model, row, radio) {
   if (!model.installed) {
-    const status = row.querySelector(".model-status");
     let bar = row.querySelector("progress");
     if (!bar) {
       bar = document.createElement("progress");
@@ -174,22 +181,31 @@ async function selectModel(model, row, radio) {
       row.querySelector(".model-info").append(bar);
     }
     radio.disabled = true;
+    pendingModel = model.id;
     try {
+      // Returns as soon as the download starts; completion arrives via the
+      // model-download-complete / model-download-error events.
       await invoke("download_model", { id: model.id });
     } catch (e) {
-      status.textContent = `Download failed: ${e}`;
-      status.classList.add("error");
-      radio.disabled = false;
-      radio.checked = false;
-      renderSettings();
-      document.querySelector(
-        `input[name="model"][value="${settings.model}"]`
-      ).checked = true;
-      return;
+      pendingModel = null;
+      showDownloadError(row, radio, e);
     }
+    return;
   }
   await save({ model: model.id });
   await refreshModels();
+}
+
+function showDownloadError(row, radio, error) {
+  const status = row.querySelector(".model-status");
+  status.textContent = `Download failed: ${error}`;
+  status.classList.add("error");
+  radio.disabled = false;
+  radio.checked = false;
+  renderSettings();
+  document.querySelector(
+    `input[name="model"][value="${settings.model}"]`
+  ).checked = true;
 }
 
 async function refreshModels() {
@@ -208,7 +224,22 @@ listen("model-download-progress", ({ payload }) => {
   )} of ${formatBytes(payload.total)}`;
 });
 
-listen("model-download-complete", refreshModels);
+listen("model-download-complete", async ({ payload }) => {
+  if (payload === pendingModel) {
+    pendingModel = null;
+    await save({ model: payload });
+  }
+  await refreshModels();
+});
+
+listen("model-download-error", ({ payload }) => {
+  if (pendingModel === null) return;
+  const row = modelList.querySelector(`[data-id="${pendingModel}"]`);
+  pendingModel = null;
+  if (!row) return;
+  showDownloadError(row, row.querySelector('input[type="radio"]'), payload);
+});
+
 listen("model-required", refreshModels);
 
 // ---------------------------------------------------------------------------
@@ -252,19 +283,21 @@ document
   .getElementById("open-accessibility")
   .addEventListener("click", () => invoke("open_accessibility_settings"));
 
-window.addEventListener("focus", () => {
-  checkAccessibility();
-  checkMicrophone();
-});
-
-// Permissions can change in System Settings while this window sits open;
-// poll so the warning cards clear (or appear) without a restart.
-setInterval(() => {
-  if (!document.hidden) {
+if (IS_MACOS) {
+  window.addEventListener("focus", () => {
     checkAccessibility();
     checkMicrophone();
-  }
-}, 3000);
+  });
+
+  // Permissions can change in System Settings while this window sits open;
+  // poll so the warning cards clear (or appear) without a restart.
+  setInterval(() => {
+    if (!document.hidden) {
+      checkAccessibility();
+      checkMicrophone();
+    }
+  }, 3000);
+}
 
 // ---------------------------------------------------------------------------
 // Init
@@ -273,6 +306,8 @@ setInterval(() => {
   settings = await invoke("get_settings");
   renderSettings();
   await refreshModels();
-  await checkAccessibility();
-  await checkMicrophone();
+  if (IS_MACOS) {
+    await checkAccessibility();
+    await checkMicrophone();
+  }
 })();
