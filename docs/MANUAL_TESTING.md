@@ -6,9 +6,9 @@ tests cannot exercise. Run through this list on each OS before a release.
 
 Logs are the first debugging stop:
 
-- macOS: `~/Library/Logs/com.murmur.murmur/murmur.log`
-- Linux: `~/.local/share/com.murmur.murmur/logs/murmur.log` (XDG data dir)
-- Windows: `%LOCALAPPDATA%\com.murmur.murmur\logs\murmur.log`
+- macOS: `~/Library/Logs/com.murmur.app/Murmur.log`
+- Linux: `~/.local/share/com.murmur.app/logs/Murmur.log` (XDG data dir)
+- Windows: `%LOCALAPPDATA%\com.murmur.app\logs\Murmur.log`
 
 ## Every OS
 

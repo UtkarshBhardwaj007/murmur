@@ -30,7 +30,14 @@ impl UiState {
 }
 
 /// Reflect a dictation state change across every UI surface.
+/// Safe to call from any thread: the dictation pipeline runs on background
+/// threads, but tray/window handles must only be touched on the main thread
+/// (see [`crate::on_main_thread`]).
 pub fn apply<R: Runtime>(app: &AppHandle<R>, state: UiState) {
+    crate::on_main_thread(app, move |app| apply_on_main(app, state));
+}
+
+fn apply_on_main<R: Runtime>(app: &AppHandle<R>, state: UiState) {
     if let Some(tray) = app.tray_by_id(crate::tray::TRAY_ID) {
         let _ = tray.set_tooltip(Some(state.tooltip()));
         match tauri::image::Image::from_bytes(state.tray_icon_bytes()) {

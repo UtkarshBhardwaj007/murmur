@@ -127,8 +127,16 @@ pub fn open_accessibility_settings() -> Result<(), String> {
     Ok(())
 }
 
+/// Start a model download. Returns as soon as the download is running;
+/// completion is reported through the `model-download-complete` /
+/// `model-download-error` events (progress via `model-download-progress`).
+///
+/// Deliberately a *sync* command with its own worker thread: an async
+/// command's future (and the webview handle inside its responder) would be
+/// dropped on a tokio worker, which is unsound on Windows — see
+/// [`crate::on_main_thread`].
 #[tauri::command]
-pub async fn download_model<R: Runtime>(app: AppHandle<R>, id: ModelId) -> Result<(), String> {
+pub fn download_model<R: Runtime>(app: AppHandle<R>, id: ModelId) -> Result<(), String> {
     let guard = app.state::<DownloadGuard>();
     if guard
         .0
@@ -138,28 +146,48 @@ pub async fn download_model<R: Runtime>(app: AppHandle<R>, id: ModelId) -> Resul
         return Err("a model download is already in progress".into());
     }
 
-    let result = do_download(&app, id).await;
-    app.state::<DownloadGuard>()
-        .0
-        .store(false, Ordering::SeqCst);
-    match &result {
-        Ok(()) => {
-            log::info!("model {id:?} downloaded and verified");
-            let _ = app.emit("model-download-complete", id);
-        }
-        Err(e) => {
-            log::error!("model download failed: {e}");
-            let _ = app.emit("model-download-error", e.clone());
-        }
-    }
-    result
+    let worker_app = app.clone();
+    std::thread::Builder::new()
+        .name("murmur-download".into())
+        .spawn(move || {
+            let app = worker_app;
+            let result = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt.block_on(do_download(&app, id)),
+                Err(e) => Err(format!("starting download runtime: {e}")),
+            };
+            app.state::<DownloadGuard>()
+                .0
+                .store(false, Ordering::SeqCst);
+            crate::on_main_thread(&app, move |app| match result {
+                Ok(()) => {
+                    log::info!("model {id:?} downloaded and verified");
+                    let _ = app.emit("model-download-complete", id);
+                }
+                Err(e) => {
+                    log::error!("model download failed: {e}");
+                    let _ = app.emit("model-download-error", e);
+                }
+            });
+        })
+        .map_err(|e| {
+            app.state::<DownloadGuard>()
+                .0
+                .store(false, Ordering::SeqCst);
+            format!("spawning download thread: {e}")
+        })?;
+    Ok(())
 }
 
 async fn do_download<R: Runtime>(app: &AppHandle<R>, id: ModelId) -> Result<(), String> {
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let emitter = app.clone();
     models::download_model(&data_dir, id, move |progress| {
-        let _ = emitter.emit("model-download-progress", &progress);
+        crate::on_main_thread(&emitter, move |app| {
+            let _ = app.emit("model-download-progress", &progress);
+        });
     })
     .await
     .map_err(|e| format!("{e:#}"))
