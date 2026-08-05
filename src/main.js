@@ -257,6 +257,15 @@ window.addEventListener("focus", () => {
   checkMicrophone();
 });
 
+// Permissions can change in System Settings while this window sits open;
+// poll so the warning cards clear (or appear) without a restart.
+setInterval(() => {
+  if (!document.hidden) {
+    checkAccessibility();
+    checkMicrophone();
+  }
+}, 3000);
+
 // ---------------------------------------------------------------------------
 // Init
 

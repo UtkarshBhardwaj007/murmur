@@ -1,7 +1,12 @@
 name: Release
 
+# Releases are cut automatically: any push to main whose version (in
+# src-tauri/tauri.conf.json) has no GitHub Release yet builds the installers
+# and publishes v<version>. Merging a version-bump PR is all it takes.
+# Pushing a v* tag by hand still works and goes through the same gate.
 on:
   push:
+    branches: [main]
     tags:
       - "v*"
 
@@ -9,7 +14,36 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decide whether this push produces a release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(python3 -c "import json; print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; nothing to do."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Will build and publish v$VERSION."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: plan
+    if: needs.plan.outputs.proceed == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -66,11 +100,11 @@ jobs:
       - name: Build bundles
         run: npm run tauri build -- --bundles ${{ matrix.bundles }} ${{ matrix.tauri-args }}
 
-      # Regression guard: macOS TCC only persists permission grants (mic,
-      # accessibility) for apps with a real code signature. A linker-signed-
-      # only binary re-prompts on every launch, so an improperly signed
-      # bundle must fail the release, not ship.
-      - name: Verify macOS code signature
+      # Regression guard: macOS TCC only persists permission grants for apps
+      # with a real code signature, and a hardened-runtime app without the
+      # audio-input entitlement is hard-denied microphone access (no prompt,
+      # no System Settings entry). Neither may ever ship.
+      - name: Verify macOS code signature and entitlements
         if: runner.os == 'macOS'
         run: |
           set -euo pipefail
@@ -82,12 +116,18 @@ jobs:
             echo "::error::bundle is only linker-signed; TCC grants will not persist"
             exit 1
           fi
+          codesign -d --entitlements - "$APP" 2>&1 | tee /tmp/murmur-entitlements.txt
+          if ! grep -q "com.apple.security.device.audio-input" /tmp/murmur-entitlements.txt; then
+            echo "::error::audio-input entitlement missing; microphone would be hard-denied"
+            exit 1
+          fi
 
       - name: Collect and rename artifacts
         shell: bash
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p dist
           case "${{ runner.os }}" in
             macOS)
@@ -116,7 +156,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
+    needs: [plan, build]
+    if: needs.plan.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -129,8 +170,9 @@ jobs:
           merge-multiple: true
 
       - name: Extract changelog section
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
           awk -v ver="$VERSION" '
             $0 ~ "^## \\[" ver "\\]" { found=1; next }
             found && /^## \[/ { exit }
@@ -142,6 +184,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.plan.outputs.version }}
           body_path: release-notes.md
           generate_release_notes: true
           files: dist/*

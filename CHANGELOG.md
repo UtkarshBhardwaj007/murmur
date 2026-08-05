@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-05
+
 ### Fixed
 
 - macOS asked for microphone permission repeatedly (several stacked prompts
@@ -16,8 +18,20 @@ and this project adheres to
   ad-hoc signed (verified in CI) and recording waits for explicit
   microphone authorization before opening the device, so the system prompt
   appears exactly once.
+- Microphone access was hard-denied on macOS — no prompt and no System
+  Settings entry — because the hardened-runtime signature carried no
+  entitlements. The bundle now ships the `audio-input` entitlement, and the
+  release workflow fails if it ever goes missing.
 - Denied microphone access now shows a guided "open System Settings" card
   instead of failing silently.
+- The permission cards in Settings now update live (no restart), and the
+  Accessibility card explains how to refresh a grant that went stale after
+  an app update (remove Murmur from the list, then re-add it).
+
+### Changed
+
+- Releases are now published automatically when a version-bump PR merges to
+  `main`.
 
 ## [0.1.0] - 2026-08-04
 
@@ -43,5 +57,6 @@ and this project adheres to
 - Installers: `.dmg` (universal macOS), `.msi` + NSIS `.exe` (Windows),
   `.AppImage` + `.deb` (Linux).
 
-[Unreleased]: https://github.com/UtkarshBhardwaj007/murmur/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/UtkarshBhardwaj007/murmur/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/UtkarshBhardwaj007/murmur/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/UtkarshBhardwaj007/murmur/releases/tag/v0.1.0

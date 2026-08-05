@@ -48,6 +48,14 @@ pub fn run() {
                 log::error!("failed to register hotkey {hotkey:?}: {e}");
             }
 
+            // Permission diagnostics up front: these two lines answer most
+            // "dictation does nothing" reports from the log alone.
+            log::info!(
+                "startup permissions: microphone={:?}, input-synthesis={}",
+                mic::status(),
+                paste::can_synthesize_input()
+            );
+
             // Auto-paste needs Accessibility on macOS; surface the guidance
             // flow up front rather than failing on the first dictation.
             if app.state::<SettingsState>().get().auto_paste && !paste::can_synthesize_input() {
