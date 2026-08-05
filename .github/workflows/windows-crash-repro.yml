@@ -1,0 +1,120 @@
+name: Windows crash repro
+
+# Diagnostic harness: install the shipped v0.1.2 Windows build on a runner,
+# launch it, click the settings window like a user would, and capture the
+# crash evidence (Windows Application Event Log + WER minidump + app log).
+# Temporary — delete once the Windows crash is fixed.
+
+on:
+  push:
+    branches: [debug/windows-crash-repro]
+  workflow_dispatch:
+
+jobs:
+  repro:
+    runs-on: windows-latest
+    steps:
+      - name: Enable WER local crash dumps
+        shell: pwsh
+        run: |
+          New-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\murmur.exe" -Force | Out-Null
+          Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\murmur.exe" -Name DumpFolder -Value "C:\dumps" -Type ExpandString
+          Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\murmur.exe" -Name DumpType -Value 2 -Type DWord
+          New-Item -ItemType Directory -Path C:\dumps -Force | Out-Null
+
+      - name: Report WebView2 runtime version
+        shell: pwsh
+        run: |
+          $paths = @(
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+            "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+          )
+          foreach ($p in $paths) {
+            if (Test-Path $p) { Get-ItemProperty $p | Select-Object pv, name | Format-List }
+          }
+
+      - name: Download and extract shipped installer
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/UtkarshBhardwaj007/murmur/releases/download/v0.1.2/murmur-0.1.2-windows-x86_64.exe" -OutFile setup.exe
+          7z x setup.exe -oapp | Out-Null
+          Get-ChildItem app
+
+      - name: Launch, click, and observe
+        shell: pwsh
+        run: |
+          Add-Type @"
+          using System;
+          using System.Runtime.InteropServices;
+          public class Win32 {
+            [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindowW(string cls, string title);
+            [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+            [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+            [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+            [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+            public struct RECT { public int Left, Top, Right, Bottom; }
+          }
+          "@
+          $p = Start-Process -FilePath "app\murmur.exe" -PassThru
+          Start-Sleep -Seconds 12
+          if ($p.HasExited) {
+            Write-Host "RESULT: app exited BEFORE any click, exit code $($p.ExitCode) (0x$('{0:X8}' -f $p.ExitCode))"
+          } else {
+            Write-Host "App is running before click (pid $($p.Id))."
+            $h = [Win32]::FindWindowW($null, "Murmur Settings")
+            Write-Host "FindWindow('Murmur Settings') = $h"
+            if ($h -eq [IntPtr]::Zero) { $h = [Win32]::FindWindowW($null, "Murmur") ; Write-Host "fallback FindWindow('Murmur') = $h" }
+            if ($h -ne [IntPtr]::Zero) {
+              [Win32]::SetForegroundWindow($h) | Out-Null
+              $r = New-Object Win32+RECT
+              [Win32]::GetWindowRect($h, [ref]$r) | Out-Null
+              $x = [int](($r.Left + $r.Right) / 2); $y = [int](($r.Top + $r.Bottom) / 2)
+              Write-Host "Window rect ($($r.Left),$($r.Top))-($($r.Right),$($r.Bottom)); clicking at $x,$y"
+              [Win32]::SetCursorPos($x, $y) | Out-Null
+              Start-Sleep -Milliseconds 300
+              [Win32]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)  # left down
+              [Win32]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)  # left up
+              Start-Sleep -Seconds 8
+              # a second click near the top of the client area, like clicking a control
+              [Win32]::SetCursorPos($x, $r.Top + 80) | Out-Null
+              [Win32]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+              [Win32]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+              Start-Sleep -Seconds 8
+            } else {
+              Write-Host "Window not found; is the app headless here?"
+              Start-Sleep -Seconds 10
+            }
+            $p.Refresh()
+            if ($p.HasExited) {
+              Write-Host "RESULT: app exited AFTER click, exit code $($p.ExitCode) (0x$('{0:X8}' -f $p.ExitCode))"
+            } else {
+              Write-Host "RESULT: app still running after clicks. No crash reproduced."
+              Stop-Process -Id $p.Id -Force
+            }
+          }
+          Start-Sleep -Seconds 5
+          exit 0
+
+      - name: Collect crash evidence
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "=== Application Event Log: Application Error (1000) / WER (1001) ==="
+          Get-WinEvent -FilterHashtable @{LogName='Application'; Id=@(1000,1001)} -MaxEvents 20 -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match 'murmur' } |
+            ForEach-Object { Write-Host "----"; Write-Host $_.Message }
+          Write-Host "=== Dumps ==="
+          Get-ChildItem C:\dumps -ErrorAction SilentlyContinue
+          Write-Host "=== App log ==="
+          $log = Join-Path $env:LOCALAPPDATA "com.murmur.app\logs\murmur.log"
+          if (Test-Path $log) { Get-Content $log } else { Write-Host "no app log at $log"; Get-ChildItem $env:LOCALAPPDATA -Directory | Select-Object -ExpandProperty Name }
+          New-Item -ItemType Directory -Path evidence -Force | Out-Null
+          Copy-Item C:\dumps\*.dmp evidence\ -ErrorAction SilentlyContinue
+          if (Test-Path $log) { Copy-Item $log evidence\ }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crash-evidence
+          path: evidence/
+          if-no-files-found: ignore
